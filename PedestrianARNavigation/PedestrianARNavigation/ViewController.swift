@@ -15,7 +15,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
 
-    func update() {
+    func update(withDestination destination: CLLocationCoordinate2D) {
         guard let currentLocation = engine.userLocationEstimate()?.location else { return }
         let coord = currentLocation.coordinate
         let geoRoute: [CLLocationCoordinate2D] = [
@@ -23,8 +23,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             CLLocationCoordinate2D(latitude: coord.latitude + 0.0001, longitude: coord.longitude - 0.00005),
             CLLocationCoordinate2D(latitude: coord.latitude + 0.00006, longitude: coord.longitude - 0.00007),
             CLLocationCoordinate2D(latitude: coord.latitude + 0.00002, longitude: coord.longitude - 0.0001),
-            CLLocationCoordinate2D(latitude: coord.latitude - 0.00005, longitude: coord.longitude - 0.00013),
-            CLLocationCoordinate2D(latitude: coord.latitude + 0.00006, longitude: coord.longitude + 0.0002)
+            destination
             ]
         let route = geoRoute
             .map { engine.convert(coordinate: $0) }
@@ -63,8 +62,10 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         routePointNodes.forEach { $0.isHidden = !sender.isOn }
     }
 
-    @objc func refreshTapped() {
-        update()
+    @objc func onSetDestinationTapped() {
+        let mapVc = MapViewController()
+        mapVc.delegate = self
+        self.present(mapVc, animated: true, completion: nil)
     }
 
     
@@ -87,13 +88,17 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         sceneView.debugOptions = []
         sceneView.automaticallyUpdatesLighting = true
 
-        let axises: SCNNode = RouteGeometryFactory.axesNode(quiverLength: 4.0, quiverThickness: 0.5)
+        let axises: SCNNode = RouteGeometryFactory.axesNode(quiverLength: 1.0, quiverThickness: 0.5)
         scene.rootNode.addChildNode(axises)
 
         // Buttons
 
-        restart.setTitle("Restart", for: .normal)
-        restart.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
+        setDestinationButton.setTitle("Set Destination", for: .normal)
+        setDestinationButton.addTarget(self, action: #selector(onSetDestinationTapped), for: .touchUpInside)
+        [setDestinationButton].forEach {
+            $0.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+            $0.setTitleColor(UIColor.white, for: .normal)
+        }
 
         routeUILabel.text = "Route UI"
         routePointsLabel.text = "Route"
@@ -101,18 +106,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         routeUISwitch.addTarget(self, action: #selector(onRouteUISwitchValueChanged), for: .valueChanged)
         routePointsSwitch.addTarget(self, action: #selector(onRoutePointsSwitchValueChanged), for: .valueChanged)
 
-
-        let settingsViews: [UIView] = [restart, routeUILabel, routeUISwitch, routePointsLabel, routePointsSwitch]
+        let settingsViews: [UIView] = [setDestinationButton, routeUILabel, routeUISwitch, routePointsLabel, routePointsSwitch]
 
         settingsViews.forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
 
-        [restart].forEach {
-            $0.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-            $0.setTitleColor(UIColor.white, for: .normal)
-        }
+
 
         [routeUILabel, routePointsLabel].forEach {
             $0.backgroundColor = UIColor.white.withAlphaComponent(0.8)
@@ -125,10 +126,10 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                                                routePointsSwitch])
         view.addEquality(of: .centerY, items: [routeUILabel, routeUISwitch, routePointsLabel,
                                                routePointsSwitch])
-        restart.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8.0).isActive = true
-        restart.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -8.0).isActive = true
-        restart.widthAnchor.constraint(equalToConstant: 100.0).isActive = true
-        restart.heightAnchor.constraint(equalToConstant: 75.0).isActive = true
+        setDestinationButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8.0).isActive = true
+        setDestinationButton.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -8.0).isActive = true
+        setDestinationButton.widthAnchor.constraint(equalToConstant: 100.0).isActive = true
+        setDestinationButton.heightAnchor.constraint(equalToConstant: 75.0).isActive = true
 
 
         engine = ARKitCoreLocationEngineImpl(
@@ -250,7 +251,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
     var engine: ARKitCoreLocationEngine!
 
-    var restart: UIButton = UIButton(type: .system)
+    var setDestinationButton: UIButton = UIButton(type: .system)
     var routePointsLabel: UILabel = UILabel()
     var routeUILabel: UILabel = UILabel()
     var routePointsSwitch: UISwitch = UISwitch()
@@ -294,6 +295,12 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 hintView.isHidden = !routeUISwitch.isOn
             }
         }
+    }
+}
+
+extension ViewController: MapViewControllerDelegate {
+    func viewController(_ mapVc: MapViewController, didSetDestination destination: CLLocationCoordinate2D) {
+        self.update(withDestination: destination)
     }
 }
 
