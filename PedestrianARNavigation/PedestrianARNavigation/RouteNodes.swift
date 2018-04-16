@@ -91,3 +91,91 @@ struct RouteGeometryFactory {
         return quiverNode
     }
 }
+
+/// Sphere node with text
+class RouteFinishNode: SCNNode {
+
+    init(radius: CGFloat, color: UIColor) {
+        super.init()
+
+        let geometry = SCNSphere(radius: radius)
+        geometry.firstMaterial?.diffuse.contents = color
+        self.geometry = geometry
+        self.pulseAnimationNode.geometry = geometry
+        self.radius = radius
+
+        textChildNode.geometry = textGeometry
+        let billboardConstraint = SCNBillboardConstraint()
+        billboardConstraint.freeAxes = SCNBillboardAxis.Y
+        self.constraints = [billboardConstraint]
+        addChildNode(textChildNode)
+        addChildNode(pulseAnimationNode)
+
+
+        let animationGroup = CAAnimationGroup.init()
+        animationGroup.duration = 1.0
+        animationGroup.repeatCount = .infinity
+
+        let opacityAnimation = CABasicAnimation(keyPath: "opacity")
+        opacityAnimation.fromValue = NSNumber(value: 1.0)
+        opacityAnimation.toValue = NSNumber(value: 0.1)
+
+        let scaleAnimation = CABasicAnimation(keyPath: "scale")
+        scaleAnimation.fromValue = NSValue(scnVector3: SCNVector3(1.0, 1.0, 1.0))
+        scaleAnimation.toValue = NSValue(scnVector3: SCNVector3(1.2, 1.2, 1.2))
+
+        animationGroup.animations = [opacityAnimation, scaleAnimation]
+        pulseAnimationNode.addAnimation(animationGroup, forKey: "animations")
+    }
+
+    required init?(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    var distance: Float = 0.0 {
+        didSet {
+            updateTextGeometry(plane: textGeometry, withText: "\(distance) м")
+        }
+    }
+
+    var radius: CGFloat = 0.0 {
+        didSet {
+            let sphereGeometry = (geometry as? SCNSphere)
+            sphereGeometry?.radius = radius
+            let pulseSphereGeometry = pulseAnimationNode.geometry as? SCNSphere
+            pulseSphereGeometry?.radius = radius
+            textChildNode.position.y = Float(radius + 0.5)
+        }
+    }
+
+    private func updateTextGeometry(plane: SCNPlane, withText text: String) {
+        let image = snapshotDistanceView(withText: text)
+        plane.width = image.size.width / 100
+        plane.height = image.size.height / 100
+        plane.firstMaterial!.diffuse.contents = image
+        plane.firstMaterial!.lightingModel = .constant
+    }
+
+    private func snapshotDistanceView(withText text: String) -> UIImage {
+        distanceView.text = text
+        distanceView.textColor = UIColor.white
+        distanceView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        let font = UIFont.systemFont(ofSize: 36.0, weight: UIFont.Weight.bold)
+        distanceView.font = font
+        let text = NSAttributedString.init(string: text,
+                                           attributes: [NSAttributedStringKey.font: font])
+        let textSize = text.boundingRect(
+            with: CGSize.init(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading], context: nil
+            ).size
+        distanceView.frame = CGRect.init(origin: .zero, size: textSize)
+        distanceView.layoutIfNeeded()
+        let distanceViewImage = UIImage.image(from: distanceView)
+        return distanceViewImage!
+    }
+
+    private var distanceView: UILabel = UILabel()
+    private let textGeometry: SCNPlane = SCNPlane()
+    private let textChildNode: SCNNode = SCNNode()
+    private let pulseAnimationNode: SCNNode = SCNNode()
+}

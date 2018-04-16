@@ -23,6 +23,8 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             CLLocationCoordinate2D(latitude: coord.latitude + 0.0001, longitude: coord.longitude - 0.00005),
             CLLocationCoordinate2D(latitude: coord.latitude + 0.00006, longitude: coord.longitude - 0.00007),
             CLLocationCoordinate2D(latitude: coord.latitude + 0.00002, longitude: coord.longitude - 0.0001),
+            CLLocationCoordinate2D(latitude: coord.latitude - 0.00005, longitude: coord.longitude - 0.00013),
+            CLLocationCoordinate2D(latitude: coord.latitude + 0.00006, longitude: coord.longitude + 0.0002)
             ]
         let route = geoRoute
             .map { engine.convert(coordinate: $0) }
@@ -36,11 +38,25 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         polylineNodes = createPolyline(forRoute: route, withAnimationLength: Constants.distanceBetweenArrows)
         let representation = createRepresentation(forRoute: route, withAnimationLength: Constants.distanceBetweenArrows)
         routePointNodes = representation.routeNodes
+
+
+        guard let routeFinishPoint = route.last else { return }
+
+        // Create route finish node
+
+        routeFinishNode = RouteFinishNode(radius: 0.0, color: UIColor.green)
+        routeFinishNode?.position = routeFinishPoint.positionIn3D
+
+        // Create route finish node hint
+
+        routeFinishHint = makeFinishNodeHint()
     }
 
 
-    @objc func onArrowsSwitchValueChanged(_ sender: UISwitch) {
+    @objc func onRouteUISwitchValueChanged(_ sender: UISwitch) {
         polylineNodes.forEach { $0.isHidden = !sender.isOn }
+        routeFinishNode?.isHidden = !sender.isOn
+        routeFinishHint?.isHidden = !sender.isOn
     }
 
     @objc func onRoutePointsSwitchValueChanged(_ sender: UISwitch) {
@@ -79,14 +95,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         restart.setTitle("Restart", for: .normal)
         restart.addTarget(self, action: #selector(refreshTapped), for: .touchUpInside)
 
-        arrowsLabel.text = "Arrows"
+        routeUILabel.text = "Route UI"
         routePointsLabel.text = "Route"
 
-        arrowsSwitch.addTarget(self, action: #selector(onArrowsSwitchValueChanged), for: .valueChanged)
+        routeUISwitch.addTarget(self, action: #selector(onRouteUISwitchValueChanged), for: .valueChanged)
         routePointsSwitch.addTarget(self, action: #selector(onRoutePointsSwitchValueChanged), for: .valueChanged)
 
 
-        let settingsViews: [UIView] = [restart, arrowsLabel, arrowsSwitch, routePointsLabel, routePointsSwitch]
+        let settingsViews: [UIView] = [restart, routeUILabel, routeUISwitch, routePointsLabel, routePointsSwitch]
 
         settingsViews.forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
@@ -98,16 +114,16 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             $0.setTitleColor(UIColor.white, for: .normal)
         }
 
-        [arrowsLabel, routePointsLabel].forEach {
+        [routeUILabel, routePointsLabel].forEach {
             $0.backgroundColor = UIColor.white.withAlphaComponent(0.8)
             $0.textColor = UIColor.black
         }
 
-        arrowsLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8.0).isActive = true
-        arrowsLabel.leftAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leftAnchor, constant: 8.0).isActive = true
-        view.addHorizontalSpacing(8.0, items: [arrowsLabel, arrowsSwitch, routePointsLabel,
+        routeUILabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8.0).isActive = true
+        routeUILabel.leftAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leftAnchor, constant: 8.0).isActive = true
+        view.addHorizontalSpacing(8.0, items: [routeUILabel, routeUISwitch, routePointsLabel,
                                                routePointsSwitch])
-        view.addEquality(of: .centerY, items: [arrowsLabel, arrowsSwitch, routePointsLabel,
+        view.addEquality(of: .centerY, items: [routeUILabel, routeUISwitch, routePointsLabel,
                                                routePointsSwitch])
         restart.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8.0).isActive = true
         restart.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -8.0).isActive = true
@@ -162,20 +178,90 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
     }
 
+    func renderer(_ renderer: SCNSceneRenderer, didRenderScene scene: SCNScene, atTime time: TimeInterval) {
+        guard let routeFinishNode = routeFinishNode else { return }
+        guard let parent = routeFinishNode.parent else { return }
+        guard let pointOfView = renderer.pointOfView else { return }
+
+        let bounds = UIScreen.main.bounds
+
+        let positionInWorld = routeFinishNode.worldPosition
+        let positionInPOV = parent.convertPosition(routeFinishNode.position, to: pointOfView)
+        let projection = sceneView.projectPoint(positionInWorld)
+        let projectionPoint = CGPoint(x: CGFloat(projection.x), y: CGFloat(projection.y))
+
+        let screenMidToProjectionLine = CGLine(point1: bounds.mid, point2: projectionPoint)
+        let intersection = screenMidToProjectionLine.intersection(withRect: bounds)
+
+        let povWorldPosition: Vector3 = Vector3(pointOfView.worldPosition)
+        let routeFinishWorldPosition: Vector3 = Vector3(positionInWorld)
+        let distanceToFinishNode = (povWorldPosition - routeFinishWorldPosition).length
+
+        DispatchQueue.main.async { [weak self] in
+            guard let slf = self else { return }
+            guard let routeFinishNode = slf.routeFinishNode else { return }
+            guard let routeFinishHint = slf.routeFinishHint else { return }
+            let placemarkSize = slf.finishPlacemarkSize(
+                forDistance: CGFloat(distanceToFinishNode),
+                closeDistance: 10.0,
+                farDistance: 25.0,
+                minSize: 50.0,
+                maxSize: 100.0
+            )
+
+            let distance = floor(distanceToFinishNode)
+            let targetPoint = SCNVector3(projection.x - Float(placemarkSize / 2), projection.y, projection.z)
+            let unprojectedTP = slf.sceneView.unprojectPoint(targetPoint)
+
+
+            let radius = (Vector3(routeFinishNode.worldPosition) - Vector3(unprojectedTP)).length
+            routeFinishNode.distance = distance
+            routeFinishNode.radius = CGFloat(radius)
+
+            print("Radius: \(radius)")
+
+            let point: CGPoint = intersection ?? projectionPoint
+            let isInFront = positionInPOV.z < 0
+            let isProjectionInScreenBounds: Bool = intersection == nil
+
+            if slf.routeUISwitch.isOn {
+                routeFinishHint.isHidden = (isInFront && intersection == nil)
+            } else {
+                routeFinishHint.isHidden = true
+            }
+
+            if isInFront {
+                routeFinishHint.center = point
+            } else {
+                if isProjectionInScreenBounds {
+                    routeFinishHint.center = CGPoint(
+                        x: reflect(point.x, of: bounds.mid.x),
+                        y: bounds.height
+                    )
+                } else {
+                    routeFinishHint.center = CGPoint(
+                        x: reflect(point.x, of: bounds.mid.x),
+                        y: reflect(point.y, of: bounds.mid.y)
+                    )
+                }
+            }
+        }
+    }
+
     var engine: ARKitCoreLocationEngine!
 
     var restart: UIButton = UIButton(type: .system)
     var routePointsLabel: UILabel = UILabel()
-    var arrowsLabel: UILabel = UILabel()
+    var routeUILabel: UILabel = UILabel()
     var routePointsSwitch: UISwitch = UISwitch()
-    var arrowsSwitch: UISwitch = UISwitch()
+    var routeUISwitch: UISwitch = UISwitch()
 
     var polylineNodes: [SCNNode] = [] {
         didSet {
             oldValue.forEach { $0.removeFromParentNode() }
             polylineNodes.forEach {
                 sceneView.scene.rootNode.addChildNode($0)
-                $0.isHidden = !arrowsSwitch.isOn
+                $0.isHidden = !routeUISwitch.isOn
             }
         }
     }
@@ -188,5 +274,78 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                 $0.isHidden = !routePointsSwitch.isOn
             }
         }
+    }
+
+    var routeFinishNode: RouteFinishNode? = nil {
+        didSet {
+            oldValue?.removeFromParentNode()
+            if let node = routeFinishNode {
+                sceneView.scene.rootNode.addChildNode(node)
+                node.isHidden = !routeUISwitch.isOn
+            }
+        }
+    }
+
+    var routeFinishHint: UIView? = nil {
+        didSet {
+            oldValue?.removeFromSuperview()
+            if let hintView = routeFinishHint {
+                view.addSubview(hintView)
+                hintView.isHidden = !routeUISwitch.isOn
+            }
+        }
+    }
+}
+
+fileprivate extension ViewController {
+
+    func makeFinishNodeHint() -> UIView {
+        let hintView = UIView()
+        hintView.frame = CGRect(x: 0.0, y: 0.0, width: 50, height: 50)
+        hintView.layer.cornerRadius = 25.0
+        hintView.backgroundColor = UIColor.red
+        return hintView
+    }
+
+    /// RouteFinishPlacemark size driven by design requirements
+    ///
+    /// - Parameters:
+    ///   - distance: distance to route finish
+    func finishPlacemarkSize(forDistance distance: CGFloat, closeDistance: CGFloat, farDistance: CGFloat,
+                             minSize: CGFloat, maxSize: CGFloat) -> CGFloat
+    {
+        guard closeDistance >= 0 else { assert(false); return 0.0 }
+        guard closeDistance >= 0, farDistance >= 0, closeDistance <= farDistance else { assert(false); return 0.0 }
+
+        if distance > farDistance {
+            return minSize
+        } else if distance < closeDistance{
+            return maxSize
+        } else {
+            let delta = maxSize - minSize
+            let percent: CGFloat = ((distance - closeDistance) / (farDistance - closeDistance))
+            let size = minSize + delta * percent
+            return size
+        }
+    }
+
+    func createSphereNode(withRadius radius: CGFloat, color: UIColor) -> SCNNode {
+        let geometry = SCNSphere(radius: radius)
+        geometry.firstMaterial?.diffuse.contents = color
+        let sphereNode = SCNNode(geometry: geometry)
+        return sphereNode
+    }
+
+    func findProjection(ofNode node: SCNNode, inSceneOfView scnView: SCNView) -> CGPoint {
+        let nodeWorldPosition = node.worldPosition
+        let projection = scnView.projectPoint(nodeWorldPosition)
+        return CGPoint(x: CGFloat(projection.x), y: CGFloat(projection.y))
+    }
+
+    func isNodeInFrontOfCamera(_ node: SCNNode, scnView: SCNView) -> Bool {
+        guard let pointOfView = scnView.pointOfView else { return false }
+        guard let parent = node.parent else { return false }
+        let positionInPOV = parent.convertPosition(node.position, to: pointOfView)
+        return positionInPOV.z < 0
     }
 }
