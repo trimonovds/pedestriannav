@@ -10,21 +10,21 @@ import UIKit
 import SceneKit
 import ARKit
 import CoreLocation
+import MapKit
 
 class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
 
-    func update(withDestination destination: CLLocationCoordinate2D) {
-        guard let currentLocation = engine.userLocationEstimate()?.location else { return }
-        let coord = currentLocation.coordinate
-        let geoRoute: [CLLocationCoordinate2D] = [
-            coord,
-            CLLocationCoordinate2D(latitude: coord.latitude + 0.0001, longitude: coord.longitude - 0.00005),
-            CLLocationCoordinate2D(latitude: coord.latitude + 0.00006, longitude: coord.longitude - 0.00007),
-            CLLocationCoordinate2D(latitude: coord.latitude + 0.00002, longitude: coord.longitude - 0.0001),
-            destination
-            ]
+    func update(withRoute route: MKRoute) {
+        let routePointsCount = route.polyline.pointCount
+        let routePoints = route.polyline.points()
+        var geoRoute: [CLLocationCoordinate2D] = []
+        for pointIndex in 0..<routePointsCount {
+            let point: MKMapPoint = routePoints[pointIndex]
+            geoRoute.append(MKCoordinateForMapPoint(point))
+        }
+
         let route = geoRoute
             .map { engine.convert(coordinate: $0) }
             .flatMap { $0 }
@@ -112,8 +112,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             $0.translatesAutoresizingMaskIntoConstraints = false
             view.addSubview($0)
         }
-
-
 
         [routeUILabel, routePointsLabel].forEach {
             $0.backgroundColor = UIColor.white.withAlphaComponent(0.8)
@@ -300,7 +298,18 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
 extension ViewController: MapViewControllerDelegate {
     func viewController(_ mapVc: MapViewController, didSetDestination destination: CLLocationCoordinate2D) {
-        self.update(withDestination: destination)
+        guard let userLocation = engine.userLocationEstimate()?.location.coordinate else { return }
+        let request = MKDirectionsRequest.init()
+        request.source = MKMapItem(placemark: MKPlacemark(coordinate: userLocation))
+        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+        request.transportType = .walking
+        let directions = MKDirections(request: request)
+        directions.calculate { [weak self] (response, error) -> Void in
+            guard let slf = self else { return }
+            guard let response = response else { return }
+            guard let route = response.routes.first else { return }
+            slf.update(withRoute: route)
+        }
     }
 }
 

@@ -12,4 +12,3 @@ public func correctionAngleByBearing(_ e1: SceneLocationEstimate, _ e2: SceneLoc
     let calculatedE2Location = e1.translatedLocation(to: e2.position)
     return bearingBetween(e1.location.coordinate, calculatedE2Location.coordinate) - bearingBetween(e1.location.coordinate, e2.location.coordinate)
 }
-
