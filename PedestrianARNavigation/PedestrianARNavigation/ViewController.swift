@@ -85,17 +85,14 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         
         // Set the scene to the view
         sceneView.scene = scene
-
-        sceneView.showsStatistics = false
-        sceneView.debugOptions = []
-        sceneView.automaticallyUpdatesLighting = true
+        sceneView.autoenablesDefaultLighting = true
 
         let axises: SCNNode = RouteGeometryFactory.axesNode(quiverLength: 1.0, quiverThickness: 0.5)
         scene.rootNode.addChildNode(axises)
 
         // Buttons
 
-        setDestinationButton.setTitle("Set Destination", for: .normal)
+        setDestinationButton.setTitle("Destination", for: .normal)
         setDestinationButton.addTarget(self, action: #selector(onSetDestinationTapped), for: .touchUpInside)
         [setDestinationButton].forEach {
             $0.backgroundColor = UIColor.black.withAlphaComponent(0.8)
@@ -128,7 +125,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                                                routePointsSwitch])
         setDestinationButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8.0).isActive = true
         setDestinationButton.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -8.0).isActive = true
-        setDestinationButton.widthAnchor.constraint(equalToConstant: 100.0).isActive = true
+        setDestinationButton.widthAnchor.constraint(equalToConstant: 125.0).isActive = true
         setDestinationButton.heightAnchor.constraint(equalToConstant: 75.0).isActive = true
 
 
