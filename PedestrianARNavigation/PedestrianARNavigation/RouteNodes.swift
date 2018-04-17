@@ -60,7 +60,6 @@ struct RouteGeometryFactory {
     static func arrowBlue() -> SCNGeometry {
         let blue = SCNMaterial()
         blue.diffuse.contents = UIColor.blue
-        blue.lightingModel = .constant
         return ARSCNPathArrow(material: blue)
     }
 

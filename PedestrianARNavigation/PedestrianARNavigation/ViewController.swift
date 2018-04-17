@@ -134,6 +134,9 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             locationManager: NativeLocationManager.sharedInstance,
             locationEstimatesHolder: AdvancedLocationEstimatesHolder()
         )
+
+        routeUISwitch.isOn = true
+        routePointsSwitch.isOn = true
     }
     
     override func viewWillAppear(_ animated: Bool) {

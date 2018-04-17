@@ -40,6 +40,11 @@ class MapViewController: UIViewController, MKMapViewDelegate {
         doneButton.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -8.0).isActive = true
         doneButton.widthAnchor.constraint(equalToConstant: 100.0).isActive = true
         doneButton.heightAnchor.constraint(equalToConstant: 75.0).isActive = true
+
+        NativeLocationManager.sharedInstance.addListener(self)
+
+        userLocationAnnotation.title = "My Location"
+        map.addAnnotation(userLocationAnnotation)
     }
 
     @objc func setDestination(_ gestureRecognizer: UIGestureRecognizer) {
@@ -77,7 +82,8 @@ class MapViewController: UIViewController, MKMapViewDelegate {
         super.viewDidAppear(animated)
 
         if let userCoordinate = NativeLocationManager.sharedInstance.location?.coordinate {
-            map.setCamera(MKMapCamera.init(lookingAtCenter: userCoordinate, fromDistance: 200.0, pitch: 0.0, heading: 0.0), animated: true)
+            let region = MKCoordinateRegion(center: userCoordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
+            self.map.setRegion(region, animated: true)
         }
     }
 
@@ -85,5 +91,16 @@ class MapViewController: UIViewController, MKMapViewDelegate {
     private var map: MKMapView!
     private var doneButton: UIButton!
     private var lastDestination: CLLocationCoordinate2D? = nil
+    private var userLocationAnnotation: MKPointAnnotation = MKPointAnnotation()
     private var destinationAnnotation: MKPointAnnotation? = nil
+}
+
+extension MapViewController: LocationManagerListener {
+
+    func onLocationUpdate(_ location: CLLocation) {
+        userLocationAnnotation.coordinate = location.coordinate
+    }
+
+    func onAuthorizationStatusUpdate(_ authorizationStatus: CLAuthorizationStatus) {
+    }
 }
