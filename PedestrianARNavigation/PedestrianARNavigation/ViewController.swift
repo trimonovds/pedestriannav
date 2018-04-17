@@ -41,21 +41,23 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
         guard let routeFinishPoint = route.last else { return }
 
-        // Create route finish node
+        // Create node for last route point
 
-        routeFinishNode = RouteFinishNode(radius: 0.0, color: UIColor.green)
+        routeFinishNode = SCNNode()
         routeFinishNode?.position = routeFinishPoint.positionIn3D
 
-        // Create route finish node hint
+        // Create route finish view and hint
 
         routeFinishHint = makeFinishNodeHint()
+        routeFinishView = makeFinishNodeView()
+        routeDistanceLabel = makeDistanceLabel()
     }
 
 
     @objc func onRouteUISwitchValueChanged(_ sender: UISwitch) {
         polylineNodes.forEach { $0.isHidden = !sender.isOn }
-        routeFinishNode?.isHidden = !sender.isOn
         routeFinishHint?.isHidden = !sender.isOn
+        routeFinishView?.isHidden = !sender.isOn
     }
 
     @objc func onRoutePointsSwitchValueChanged(_ sender: UISwitch) {
@@ -198,8 +200,9 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
         DispatchQueue.main.async { [weak self] in
             guard let slf = self else { return }
-            guard let routeFinishNode = slf.routeFinishNode else { return }
             guard let routeFinishHint = slf.routeFinishHint else { return }
+            guard let routeFinishView = slf.routeFinishView else { return }
+            guard let routeDistanceLabel = slf.routeDistanceLabel else { return }
             let placemarkSize = slf.finishPlacemarkSize(
                 forDistance: CGFloat(distanceToFinishNode),
                 closeDistance: 10.0,
@@ -209,15 +212,6 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             )
 
             let distance = floor(distanceToFinishNode)
-            let targetPoint = SCNVector3(projection.x - Float(placemarkSize / 2), projection.y, projection.z)
-            let unprojectedTP = slf.sceneView.unprojectPoint(targetPoint)
-
-
-            let radius = (Vector3(routeFinishNode.worldPosition) - Vector3(unprojectedTP)).length
-            routeFinishNode.distance = distance
-            routeFinishNode.radius = CGFloat(radius)
-
-            print("Radius: \(radius)")
 
             let point: CGPoint = intersection ?? projectionPoint
             let isInFront = positionInPOV.z < 0
@@ -225,8 +219,12 @@ class ViewController: UIViewController, ARSCNViewDelegate {
 
             if slf.routeUISwitch.isOn {
                 routeFinishHint.isHidden = (isInFront && intersection == nil)
+                routeFinishView.isHidden = !routeFinishHint.isHidden
+                routeDistanceLabel.isHidden = routeFinishView.isHidden
             } else {
                 routeFinishHint.isHidden = true
+                routeFinishView.isHidden = true
+                routeDistanceLabel.isHidden = true
             }
 
             if isInFront {
@@ -244,6 +242,17 @@ class ViewController: UIViewController, ARSCNViewDelegate {
                     )
                 }
             }
+
+            routeFinishView.center = projectionPoint
+            routeFinishView.bounds.size = CGSize(width: placemarkSize, height: placemarkSize)
+            routeFinishView.layer.cornerRadius = placemarkSize / 2
+
+            let distanceString = "\(distance) м"
+            let distanceAttrStr = ViewController.distanceText(forString: distanceString)
+            routeDistanceLabel.attributedText = distanceAttrStr
+            routeDistanceLabel.center = projectionPoint
+            let size = distanceAttrStr.boundingSize(width: .greatestFiniteMagnitude)
+            routeDistanceLabel.bounds.size = size
         }
     }
 
@@ -275,12 +284,31 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         }
     }
 
-    var routeFinishNode: RouteFinishNode? = nil {
+    var routeFinishNode: SCNNode? = nil {
         didSet {
             oldValue?.removeFromParentNode()
             if let node = routeFinishNode {
                 sceneView.scene.rootNode.addChildNode(node)
-                node.isHidden = !routeUISwitch.isOn
+            }
+        }
+    }
+
+    var routeFinishView: UIView? = nil {
+        didSet {
+            oldValue?.removeFromSuperview()
+            if let routeFinishView = routeFinishView {
+                view.addSubview(routeFinishView)
+                routeFinishView.isHidden = !routeUISwitch.isOn
+            }
+        }
+    }
+
+    var routeDistanceLabel: UILabel? = nil {
+        didSet {
+            oldValue?.removeFromSuperview()
+            if let label = routeDistanceLabel {
+                view.addSubview(label)
+                label.isHidden = !routeUISwitch.isOn
             }
         }
     }
@@ -315,12 +343,39 @@ extension ViewController: MapViewControllerDelegate {
 
 fileprivate extension ViewController {
 
+    static func distanceText(forString string: String) -> NSAttributedString {
+        return NSMutableAttributedString(string: string, attributes: [
+            .strokeColor : UIColor.black,
+            .foregroundColor : UIColor.white,
+            .strokeWidth : -1.0,
+            .font : UIFont.boldSystemFont(ofSize: 32.0)
+            ])
+    }
+
+    func makeFinishNodeView() -> UIView {
+        let nodeView = UIView()
+        nodeView.backgroundColor = UIColor.green
+        return nodeView
+    }
+
     func makeFinishNodeHint() -> UIView {
         let hintView = UIView()
         hintView.frame = CGRect(x: 0.0, y: 0.0, width: 50, height: 50)
         hintView.layer.cornerRadius = 25.0
         hintView.backgroundColor = UIColor.red
         return hintView
+    }
+
+    func makeDistanceLabel() -> UILabel {
+        let label = UILabel()
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 32.0, weight: .bold)
+        label.numberOfLines = 1
+        label.layer.shadowRadius = 2.0
+        label.layer.shadowColor = UIColor.black.cgColor
+        label.layer.shadowOpacity = 1.0
+        label.layer.shadowOffset = CGSize.zero
+        return label
     }
 
     /// RouteFinishPlacemark size driven by design requirements
@@ -343,13 +398,6 @@ fileprivate extension ViewController {
             let size = minSize + delta * percent
             return size
         }
-    }
-
-    func createSphereNode(withRadius radius: CGFloat, color: UIColor) -> SCNNode {
-        let geometry = SCNSphere(radius: radius)
-        geometry.firstMaterial?.diffuse.contents = color
-        let sphereNode = SCNNode(geometry: geometry)
-        return sphereNode
     }
 
     func findProjection(ofNode node: SCNNode, inSceneOfView scnView: SCNView) -> CGPoint {
