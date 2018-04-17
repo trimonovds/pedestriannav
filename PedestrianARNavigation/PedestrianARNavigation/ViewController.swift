@@ -191,6 +191,12 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         let projection = sceneView.projectPoint(positionInWorld)
         let projectionPoint = CGPoint(x: CGFloat(projection.x), y: CGFloat(projection.y))
 
+        let annotationPositionInRFN = SCNVector3Make(0.0, 1.0, 0.0) // in Route finish node coord. system
+        let annotationPositionInWorld = routeFinishNode.convertPosition(annotationPositionInRFN, to: nil)
+        let annotationProjection = sceneView.projectPoint(annotationPositionInWorld)
+        let annotationProjectionPoint = CGPoint(x: CGFloat(annotationProjection.x), y: CGFloat(annotationProjection.y))
+        let rotationAngle = Vector2.y.angle(with: (Vector2(annotationProjectionPoint) - Vector2(projectionPoint)))
+
         let screenMidToProjectionLine = CGLine(point1: bounds.mid, point2: projectionPoint)
         let intersection = screenMidToProjectionLine.intersection(withRect: bounds)
 
@@ -253,6 +259,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
             routeDistanceLabel.center = projectionPoint
             let size = distanceAttrStr.boundingSize(width: .greatestFiniteMagnitude)
             routeDistanceLabel.bounds.size = size
+            routeDistanceLabel.transform = CGAffineTransform(rotationAngle: CGFloat(rotationAngle - .pi))
         }
     }
 
