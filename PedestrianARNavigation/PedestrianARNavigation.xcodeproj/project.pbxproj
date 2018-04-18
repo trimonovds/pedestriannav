@@ -39,6 +39,7 @@
 		8735E1D120851DBE008BA9F4 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8735E1D020851DBE008BA9F4 /* MapKit.framework */; };
 		8735E1D320851E1F008BA9F4 /* MapViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8735E1D220851E1F008BA9F4 /* MapViewController.swift */; };
 		87F9929F2087682400F2ECED /* PedestrianARNavigationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F9929E2087682400F2ECED /* PedestrianARNavigationTests.swift */; };
+		87F992A72087859900F2ECED /* DebugMessageUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87F992A62087859900F2ECED /* DebugMessageUtils.swift */; };
 		87FC5933208738C200BDDD47 /* EmailSender.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87FC5932208738C200BDDD47 /* EmailSender.swift */; };
 /* End PBXBuildFile section */
 
@@ -89,6 +90,7 @@
 		87F9929C2087682400F2ECED /* PedestrianARNavigationTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PedestrianARNavigationTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		87F9929E2087682400F2ECED /* PedestrianARNavigationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PedestrianARNavigationTests.swift; sourceTree = "<group>"; };
 		87F992A02087682400F2ECED /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		87F992A62087859900F2ECED /* DebugMessageUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugMessageUtils.swift; sourceTree = "<group>"; };
 		87FC5932208738C200BDDD47 /* EmailSender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSender.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -254,6 +256,7 @@
 			isa = PBXGroup;
 			children = (
 				87FC5932208738C200BDDD47 /* EmailSender.swift */,
+				87F992A62087859900F2ECED /* DebugMessageUtils.swift */,
 			);
 			path = Debug;
 			sourceTree = "<group>";
@@ -390,6 +393,7 @@
 				8735E1D320851E1F008BA9F4 /* MapViewController.swift in Sources */,
 				8735E1AC2085038A008BA9F4 /* SceneLocationEstimate+Extensions.swift in Sources */,
 				8735E19520850340008BA9F4 /* Utils.swift in Sources */,
+				87F992A72087859900F2ECED /* DebugMessageUtils.swift in Sources */,
 				8735E1BA208503D7008BA9F4 /* TimerAction.swift in Sources */,
 				8735E1B7208503D7008BA9F4 /* AutoLayout.swift in Sources */,
 				8735E1AE2085038A008BA9F4 /* NativeLocationManager.swift in Sources */,

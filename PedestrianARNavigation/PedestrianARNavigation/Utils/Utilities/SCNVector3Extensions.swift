@@ -101,6 +101,16 @@ extension SCNVector3
     }
 }
 
+public extension SCNVector3 {
+    func rotatedClockwise(byAngle angle: Double) -> SCNVector3  {
+        return SCNVector3Make(
+            x * Float(cos(angle)) - z * Float(sin(angle)),
+            y,
+            x * Float(sin(angle)) + z * Float(cos(angle))
+        )
+    }
+}
+
 /**
  * Adds two SCNVector3 vectors and returns the result as a new SCNVector3.
  */
