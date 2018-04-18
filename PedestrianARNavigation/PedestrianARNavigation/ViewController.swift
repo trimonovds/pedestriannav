@@ -12,11 +12,43 @@ import ARKit
 import CoreLocation
 import MapKit
 
+class DebugRouteInfoHolder {
+
+    struct DebugEsimate {
+        var estimate: SceneLocationEstimate
+        var estimateARLocation: CLLocation
+        var estimateLocationRelativeToStart: CLLocation
+
+        var estimateCLLocation: CLLocation {
+            return estimate.location
+        }
+    }
+
+    func addEstimate(_ estimate: DebugEsimate) {
+        debugEsimates.append(estimate)
+    }
+
+    func addBestEstimate(_ bestEstimate: SceneLocationEstimate) {
+        bestEstimates.append(bestEstimate)
+    }
+
+    func refresh() {
+        debugEsimates = []
+        bestEstimates = []
+    }
+
+    private(set) var debugEsimates: [DebugEsimate] = []
+    private(set) var bestEstimates: [SceneLocationEstimate] = []
+}
+
 class ViewController: UIViewController, ARSCNViewDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
 
     func update(withRoute route: MKRoute) {
+
+        engine.refreshDebugInfo()
+
         let routePointsCount = route.polyline.pointCount
         let routePoints = route.polyline.points()
         var geoRoute: [CLLocationCoordinate2D] = []
@@ -70,6 +102,52 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         self.present(mapVc, animated: true, completion: nil)
     }
 
+    @objc func onEmailTapped() {
+        let emailSender = EmailSender()
+        emailSender.sendEmail(controller: self, message: createMessage(from: engine.debugRouteInfo))
+    }
+
+    func createMessage(from debugRouteInfo: DebugRouteInfo) -> String {
+
+        let debugEstimates = debugRouteInfo.debugEstimates
+        let bestEstimates = debugRouteInfo.bestEstimates
+        var coreLocationStr = "var coreLocationPoints = [\n"
+        for e in debugEstimates {
+            let estimateStr = "{point: [\(e.estimateCLLocation.coordinate.lat), \(e.estimateCLLocation.coordinate.lon)], accuracy: \(e.estimateCLLocation.horizontalAccuracy)},\n"
+            coreLocationStr.append(estimateStr)
+        }
+        coreLocationStr.append("\n]")
+
+        var arStr = "var arPoints = [\n"
+        for e in debugEstimates {
+            let estimateStr = "{point: [\(e.estimateARLocation.coordinate.lat), \(e.estimateARLocation.coordinate.lon)], accuracy: \(e.estimateARLocation.horizontalAccuracy)},\n"
+            arStr.append(estimateStr)
+        }
+        arStr.append("\n]")
+
+        var relativeToStartStr = "var relToStartPoints = [\n"
+        for e in debugEstimates {
+            let estimateStr = "{point: [\(e.estimateLocationRelativeToStart.coordinate.lat), \(e.estimateLocationRelativeToStart.coordinate.lon)], accuracy: \(e.estimateLocationRelativeToStart.horizontalAccuracy)},\n"
+            relativeToStartStr.append(estimateStr)
+        }
+        relativeToStartStr.append("\n]")
+
+        var bestEstimatesStr = "var bestEstimates = [\n"
+        for e in bestEstimates {
+            let estimateStr = "[SLE location: \(e.location), position: \(e.position)]\n"
+            bestEstimatesStr.append(estimateStr)
+        }
+        bestEstimatesStr.append("\n]")
+
+        var estimatesStr = "var estimates = [\n"
+        for e in bestEstimates {
+            let estimateStr = "[SLE location: \(e.location), position: \(e.position)]\n"
+            estimatesStr.append(estimateStr)
+        }
+        estimatesStr.append("\n]")
+
+        return estimatesStr + "\n" + coreLocationStr + "\n" + arStr + "\n" + relativeToStartStr + "\n" + bestEstimatesStr
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -93,8 +171,10 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         // Buttons
 
         setDestinationButton.setTitle("Destination", for: .normal)
+        emailButton.setTitle("email", for: .normal)
         setDestinationButton.addTarget(self, action: #selector(onSetDestinationTapped), for: .touchUpInside)
-        [setDestinationButton].forEach {
+        emailButton.addTarget(self, action: #selector(onEmailTapped), for: .touchUpInside)
+        [setDestinationButton, emailButton].forEach {
             $0.backgroundColor = UIColor.black.withAlphaComponent(0.8)
             $0.setTitleColor(UIColor.white, for: .normal)
         }
@@ -105,7 +185,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         routeUISwitch.addTarget(self, action: #selector(onRouteUISwitchValueChanged), for: .valueChanged)
         routePointsSwitch.addTarget(self, action: #selector(onRoutePointsSwitchValueChanged), for: .valueChanged)
 
-        let settingsViews: [UIView] = [setDestinationButton, routeUILabel, routeUISwitch, routePointsLabel, routePointsSwitch]
+        let settingsViews: [UIView] = [setDestinationButton, emailButton, routeUILabel, routeUISwitch, routePointsLabel, routePointsSwitch]
 
         settingsViews.forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
@@ -127,6 +207,11 @@ class ViewController: UIViewController, ARSCNViewDelegate {
         setDestinationButton.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -8.0).isActive = true
         setDestinationButton.widthAnchor.constraint(equalToConstant: 125.0).isActive = true
         setDestinationButton.heightAnchor.constraint(equalToConstant: 75.0).isActive = true
+
+        emailButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8.0).isActive = true
+        emailButton.rightAnchor.constraint(equalTo: setDestinationButton.leftAnchor, constant: -8.0).isActive = true
+        emailButton.widthAnchor.constraint(equalToConstant: 125.0).isActive = true
+        emailButton.heightAnchor.constraint(equalToConstant: 75.0).isActive = true
 
 
         engine = ARKitCoreLocationEngineImpl(
@@ -267,6 +352,7 @@ class ViewController: UIViewController, ARSCNViewDelegate {
     var engine: ARKitCoreLocationEngine!
 
     var setDestinationButton: UIButton = UIButton(type: .system)
+    var emailButton: UIButton = UIButton(type: .system)
     var routePointsLabel: UILabel = UILabel()
     var routeUILabel: UILabel = UILabel()
     var routePointsSwitch: UISwitch = UISwitch()

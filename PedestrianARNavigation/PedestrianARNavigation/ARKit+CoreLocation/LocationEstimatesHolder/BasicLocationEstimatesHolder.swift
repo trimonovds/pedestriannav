@@ -10,7 +10,15 @@ import Foundation
 
 class BasicLocationEstimatesHolder: LocationEstimatesHolder {
 
-    private(set) var bestLocationEstimate: SceneLocationEstimate? = nil
+    private(set) var bestLocationEstimate: SceneLocationEstimate? = nil {
+        didSet {
+            guard let bestEstimate = bestLocationEstimate else { return }
+            notifier.notify( { listener in
+                listener.locationEstimatesHolder(self, didUpdateBestEstimate: bestEstimate)
+            })
+        }
+    }
+
     private(set) var estimates: [SceneLocationEstimate] = []
 
     func add(_ locationEstimate: SceneLocationEstimate) {
@@ -32,4 +40,14 @@ class BasicLocationEstimatesHolder: LocationEstimatesHolder {
         if let bestEstimate = bestLocationEstimate, !removed.contains(bestEstimate) { return }
         bestLocationEstimate = estimates.sorted{ $0 < $1 }.first
     }
+
+    func addListener(_ listener: LocationEstimatesHolderListener) {
+        notifier.addListener(listener)
+    }
+
+    func removeListener(_ listener: LocationEstimatesHolderListener) {
+        notifier.removeListener(listener)
+    }
+
+    private var notifier = Notifier<LocationEstimatesHolderListener>()
 }

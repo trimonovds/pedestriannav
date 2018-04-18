@@ -15,4 +15,12 @@ protocol LocationEstimatesHolder {
 
     func add(_ locationEstimate: SceneLocationEstimate)
     func filter(_ isIncluded: (SceneLocationEstimate) -> Bool)
+
+    func addListener(_ listener: LocationEstimatesHolderListener)
+    func removeListener(_ listener: LocationEstimatesHolderListener)
+}
+
+protocol LocationEstimatesHolderListener {
+    func locationEstimatesHolder(_ locationEstimatesHolder: LocationEstimatesHolder,
+                                 didUpdateBestEstimate bestEstimate: SceneLocationEstimate)
 }

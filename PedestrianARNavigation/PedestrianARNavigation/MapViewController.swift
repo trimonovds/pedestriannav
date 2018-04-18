@@ -82,6 +82,7 @@ class MapViewController: UIViewController, MKMapViewDelegate {
         super.viewDidAppear(animated)
 
         if let userCoordinate = NativeLocationManager.sharedInstance.location?.coordinate {
+            updateUserLocationAnnotation(withCoordinate: userCoordinate)
             let region = MKCoordinateRegion(center: userCoordinate, span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01))
             self.map.setRegion(region, animated: true)
         }
@@ -98,9 +99,13 @@ class MapViewController: UIViewController, MKMapViewDelegate {
 extension MapViewController: LocationManagerListener {
 
     func onLocationUpdate(_ location: CLLocation) {
-        userLocationAnnotation.coordinate = location.coordinate
+        updateUserLocationAnnotation(withCoordinate: location.coordinate)
     }
 
     func onAuthorizationStatusUpdate(_ authorizationStatus: CLAuthorizationStatus) {
+    }
+
+    func updateUserLocationAnnotation(withCoordinate coordinate: CLLocationCoordinate2D) {
+        userLocationAnnotation.coordinate = coordinate
     }
 }

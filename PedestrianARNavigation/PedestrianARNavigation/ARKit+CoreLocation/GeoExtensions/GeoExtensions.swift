@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import SceneKit
+import MapKit
 
 public struct GeometryConstants {
     public static let EarthRadius = Double(6_371_000)
@@ -54,8 +55,9 @@ public extension SceneLocationEstimate {
 
     /// Translates the location by comparing with a given position
     public func translatedLocation(to position: SCNVector3) -> CLLocation {
-        let geoTranslationByPosition = self.position.locationTranslation(to: position)
-        let translatedCoordinate = self.location.coordinate.translated(with: geoTranslationByPosition)
+        let translation = position - self.position
+        let translatedCoordinate = location.coordinate.transform(using: CLLocationDistance(-translation.z),
+                                                                 longitudinalMeters: CLLocationDistance(translation.x))
         return CLLocation(
             coordinate: translatedCoordinate,
             altitude: location.altitude,
@@ -148,6 +150,11 @@ public extension CLLocationCoordinate2D {
 
     var lon: Double {
         return longitude
+    }
+
+    public func transform(using latitudinalMeters: CLLocationDistance, longitudinalMeters: CLLocationDistance) -> CLLocationCoordinate2D {
+        let region = MKCoordinateRegionMakeWithDistance(self, latitudinalMeters, longitudinalMeters)
+        return CLLocationCoordinate2D(latitude: latitude + region.span.latitudeDelta, longitude: longitude + region.span.longitudeDelta)
     }
 
     /// Calculate translation between to coordinates

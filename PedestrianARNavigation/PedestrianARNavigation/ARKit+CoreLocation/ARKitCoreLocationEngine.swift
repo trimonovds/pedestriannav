@@ -11,6 +11,11 @@ import CoreLocation
 import SceneKit
 import ARKit
 
+struct DebugRouteInfo {
+    var debugEstimates: [DebugRouteInfoHolder.DebugEsimate]
+    var bestEstimates: [SceneLocationEstimate]
+}
+
 protocol ARKitCoreLocationEngine {
     /// Converts geo coordinate to 3D position
     ///
@@ -18,9 +23,20 @@ protocol ARKitCoreLocationEngine {
     /// - Returns: position on 3D scene with y = 0
     func convert(coordinate: CLLocationCoordinate2D) -> SCNVector3?
     func userLocationEstimate() -> SceneLocationEstimate?
+
+    var debugRouteInfo: DebugRouteInfo { get }
+
+    func refreshDebugInfo()
 }
 
 class ARKitCoreLocationEngineImpl: NSObject, ARKitCoreLocationEngine {
+
+    var debugRouteInfo: DebugRouteInfo {
+        return DebugRouteInfo(
+            debugEstimates: debugRouteInfoHolder.debugEsimates,
+            bestEstimates: debugRouteInfoHolder.bestEstimates
+        )
+    }
 
     init(view: SCNView, locationManager: LocationManager, locationEstimatesHolder: LocationEstimatesHolder) {
         self.scnView = view
@@ -28,8 +44,13 @@ class ARKitCoreLocationEngineImpl: NSObject, ARKitCoreLocationEngine {
         self.locationEstimatesHolder = locationEstimatesHolder
         super.init()
 
+        locationEstimatesHolder.addListener(self)
         filterLocationEstimatesAction = TimerAction(timeInterval: 3.0, repeats: true) { [weak self] in
             self?.filterLocationEstimates()
+        }
+
+        if let currentLocation = NativeLocationManager.sharedInstance.location {
+            self.onLocationUpdate(currentLocation)
         }
         locationManager.addListener(self)
     }
@@ -53,10 +74,15 @@ class ARKitCoreLocationEngineImpl: NSObject, ARKitCoreLocationEngine {
         )
     }
 
+    func refreshDebugInfo() {
+        debugRouteInfoHolder.refresh()
+    }
+
     private let scnView: SCNView
     private let locationManager: LocationManager
     private let locationEstimatesHolder: LocationEstimatesHolder
     private var filterLocationEstimatesAction: TimerAction? = nil
+    private let debugRouteInfoHolder: DebugRouteInfoHolder = DebugRouteInfoHolder()
 }
 
 extension ARKitCoreLocationEngineImpl {
@@ -79,6 +105,12 @@ extension ARKitCoreLocationEngineImpl {
     }
 }
 
+extension ARKitCoreLocationEngineImpl: LocationEstimatesHolderListener {
+    func locationEstimatesHolder(_ locationEstimatesHolder: LocationEstimatesHolder, didUpdateBestEstimate bestEstimate: SceneLocationEstimate) {
+        debugRouteInfoHolder.addBestEstimate(bestEstimate)
+    }
+}
+
 extension ARKitCoreLocationEngineImpl: LocationManagerListener {
     func onAuthorizationStatusUpdate(_ authorizationStatus: CLAuthorizationStatus) {
         
@@ -88,5 +120,20 @@ extension ARKitCoreLocationEngineImpl: LocationManagerListener {
         guard let positionOnScene = currentScenePosition() else { return }
         let newLocationEstimate = SceneLocationEstimate(location: location, position: positionOnScene)
         locationEstimatesHolder.add(newLocationEstimate)
+
+        // Add debug info
+        guard let userLocationEstimate = userLocationEstimate() else { return }
+        let locationRelativeToStart: CLLocation
+        if let firstDebugEstimate = debugRouteInfoHolder.debugEsimates.first {
+            locationRelativeToStart = firstDebugEstimate.estimate.translatedLocation(to: positionOnScene)
+        } else {
+            locationRelativeToStart = location
+        }
+        let debugEstimate = DebugRouteInfoHolder.DebugEsimate(
+            estimate: newLocationEstimate,
+            estimateARLocation: userLocationEstimate.location,
+            estimateLocationRelativeToStart: locationRelativeToStart
+        )
+        debugRouteInfoHolder.addEstimate(debugEstimate)
     }
 }
